@@ -158,9 +158,9 @@ projetos/3-deteccao-mascaras/
 ### 3️⃣ Técnica de Otimização do Modelo
 
 O modelo foi exportado para LiteRT (formato `.tflite`) com **quantização INT8 estática** via `quantize=8`. O processo:
-**1.** Converte o grafo PyTorch → ONNX → LiteRT
-**2.** Executa calibração no dataset de validação (`data="dataset/data.yaml"`) para determinar thresholds de quantização por camada
-**3.** Reduz os pesos de FP32 (4 bytes) para INT8 (1 byte), resultando em um modelo ~4× menor
+1. Converte o grafo PyTorch → ONNX → LiteRT
+2. Executa calibração no dataset de validação (`data="dataset/data.yaml"`) para determinar thresholds de quantização por camada
+3. Reduz os pesos de FP32 (4 bytes) para INT8 (1 byte), resultando em um modelo ~4× menor
 
 A técnica utilizada é **post-training quantization (PTQ) estática com calibração**, que oferece boa relação compressão × acurácia sem necessidade de re-treino.
 
@@ -204,12 +204,12 @@ Limitações do modelo:
 - A exportação INT8 com LiteRT gera o arquivo como `model_int8.tflite`, exigindo renomeação manual ou `shutil.copy` para o nome esperado (`model.tflite`).
 
 ### 6️⃣ Exemplo de Inferência
-
+```
 ============================================================
 Projeto 3 — Inferência com model.tflite (Edge AI)
 ============================================================
 
-- Rodando inferência em 5 amostras usando model.tflite:
+Rodando inferência em 5 amostras usando model.tflite:
 
 Imagem                               Detecções  Detalhes
 ----------------------------------------------------------------------
@@ -230,7 +230,7 @@ TOTAL                                       74
 
 ✅ Imagens anotadas salvas em: runs/detect/inferencia_exemplos/predicoes/
    (Abra essa pasta para verificar visualmente as bounding boxes preditas)
-
+```
 **Observações:** 
 - Em algumas imagens, as labels ficaram sobrepostas aos rostos, mas isso é apenas visual e não impacta as detecções.
 - Na imagem maksssksksss11.jpg, o modelo detectou 35 rostos — 32 com máscara correta, 2 com máscara incorreta e 1 sem máscara — demonstrando que a classe minoritária está sendo capturada mesmo em cenas densas.
