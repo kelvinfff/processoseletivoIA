@@ -14,16 +14,13 @@ from ultralytics import YOLO
 #      para "model.pt", na raiz desta pasta
 # ---------------------------------------------------------------------------
 
-# insira seu código aqui
-
-# Dica de estrutura (não é obrigatório seguir exatamente assim):
-#
-# model = YOLO("yolo11n.pt")
-# results = model.train(
-#     data="dataset/data.yaml",
-#     epochs=...,
-#     imgsz=...,
-#     batch=...,
-#     device="cpu",
-# )
-# shutil.copy(results.save_dir / "weights" / "best.pt", "model.pt")
+model = YOLO("yolo11n.pt")
+results = model.train(
+    data="dataset/data.yaml",
+    epochs=20,
+    imgsz=640,
+    batch=8,
+    device="cpu",
+    cls_pw=0.5
+)
+shutil.copy(results.save_dir / "weights" / "best.pt", "model.pt")

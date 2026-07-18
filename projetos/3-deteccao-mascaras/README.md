@@ -130,39 +130,110 @@ projetos/3-deteccao-mascaras/
 
 ## 📝 Relatório do Candidato
 
-👤 **Nome Completo:**
+👤 **Nome Completo:** Kelvin Oliveira Fernandes
 
 ### 1️⃣ Resumo da Abordagem
 
-Descreva os hiperparâmetros de fine-tuning utilizados (épocas, tamanho de
-imagem, batch size) e quaisquer ajustes feitos para lidar com o desbalanceamento
-de classes, se houver.
+- **Épocas: 20:** (dentro da faixa 15-30 sugerida para CPU)
+- **Tamanho de imagem:** 640x640 (padrão do YOLO11n, mesmo tamanho do pré-treino)
+- **Batch size:** 8 (adequado para CPU com 8+ GB de RAM) 
+- **Device:** CPU (conforme requisito do projeto)
+- **Desbalanceamento:** O dataset é desbalanceado — a classe `mask_weared_incorrect` representa apenas ~2.6% das instâncias de validação (19 de 726), enquanto `with_mask` domina com ~82% (593 instâncias). Para mitigar esse problema, foi utilizado o parâmetro `cls_pw=0.5`, que aplica pesos inversamente proporcionais à frequência de cada classe na loss de classificação:
+  - Cálculo: `peso_classe = (1 / n_instâncias) ^ 0.5`
+  - Efeito: a classe minoritária recebeu peso ~5.6× maior que `with_mask`, forçando o modelo a prestar mais atenção nela durante o treino
+- Com `cls_pw=0.5`, o mAP50 da classe mask_weared_incorrect subiu de **0.549 → 0.611 (+11.3%)** sem degradar as classes majoritárias (`with_mask` manteve 0.964), e o mAP50 geral subiu de 0.773 para 0.793.
 
 ### 2️⃣ Bibliotecas Utilizadas
 
-Liste as principais bibliotecas utilizadas, preferencialmente com suas versões.
+| Biblioteca | Versão | Finalidade |
+| --- | --- | --- |
+| **ultralytics** | 8.4.99 | Framework YOLO — treino, exportação, inferência |
+| **torch** | 2.13.0 | Backend de deep learning (PyTorch) |
+| **torchvision** | 0.28.0 | Operações de visão computacional |
+| **litert-torch** | 0.9.1 | Exportação para o formato LiteRT/TFLite |
+| **ai-edge-litert** | 2.1.5 | Runtime LiteRT para inferência em edge |
+| **opencv-python** | 5.0.0.93 | Manipulação de imagens |
+| **numpy** | 2.4.6 | Operações numéricas |
 
 ### 3️⃣ Técnica de Otimização do Modelo
 
-Explique o processo de exportação para TFLite realizado em `optimize_model.py`.
+O modelo foi exportado para LiteRT (formato `.tflite`) com **quantização INT8 estática** via `quantize=8`. O processo:
+**1.** Converte o grafo PyTorch → ONNX → LiteRT
+**2.** Executa calibração no dataset de validação (`data="dataset/data.yaml"`) para determinar thresholds de quantização por camada
+**3.** Reduz os pesos de FP32 (4 bytes) para INT8 (1 byte), resultando em um modelo ~4× menor
+
+A técnica utilizada é **post-training quantization (PTQ) estática com calibração**, que oferece boa relação compressão × acurácia sem necessidade de re-treino.
 
 ### 4️⃣ Resultados Obtidos
 
-Informe o mAP50 (e, se possível, o mAP50-95) obtido na validação, por classe se
-possível, e o tamanho dos arquivos `model.pt` e `model.tflite`.
+#### mAP por classe (validação):
+
+| Classe | Imagens | Instâncias | mAP50 | mAP50-95 |
+| --- | --- | --- | --- | --- |
+| **Todas** | 170 | 726 | 0.793 | 0.549 |
+| **with_mask** | 149 | 593 | 0.964 | 0.674 |
+| **without_mask** | 57 | 114 | 0.803 | 0.529 |
+| **mask_weared_incorrect** | 15 | 19 | 0.611 | 0.445 |
+
+#### Impacto do cls_pw=0.5:
+
+| Classe | Sem cls_pw | Com cls_pw | Ganho |
+| --- | --- | --- | --- |
+| **Todas** | 0.773 | 0.793 | +2.6% |
+| **mask_weared_incorrect** | 0.549 | 0.611 | +11.3% |
+
+#### Tamanho dos artefatos:
+
+| Arquivo | Precisão | Tamanho |
+| --- | --- | --- |
+| **model.pt** | FP32 | 5.3 MB |
+| **model.tflite** | INT8 | 3.0 MB |
 
 ### 5️⃣ Comentários Adicionais (Opcional)
 
-Dificuldades encontradas, decisões técnicas importantes, limitações do modelo
-(ex: desempenho na classe minoritária), aprendizados durante o desafio.
+**Dificuldades encontradas:**
+- **Auto-update travado:** durante a exportação para TFLite, a instalação automática de `litert-torch` e `ai-edge-litert` ficou parada por ~15 minutos. Foi necessário cancelar e instalar as dependências manualmente.
+- **Incompatibilidade torch/torchvision:** o `run_inference.py` quebrou com `RuntimeError: operator torchvision::nms does not exist.` O `requirements.txt` só especificava `ultralytics>=8.4`, e o pip resolveu versões incompatíveis entre PyTorch 2.13 e torchvision 0.28. Resolvido com `pip install --upgrade torch torchvision`.
+
+Decisões técnicas:
+- Uso de `cls_pw=0.5` para mitigar o desbalanceamento — a classe `mask_weared_incorrect` melhorou de 0.549 → 0.611 (+11.3%) sem penalizar as demais.
+- `batch=8` e `epochs=20` como equilíbrio entre tempo de treino em CPU e qualidade do modelo.
+
+Limitações do modelo:
+- A classe `mask_weared_incorrect` (apenas 19 instâncias na validação) permanece com desempenho inferior (mAP50 0.611 vs 0.964 das máscaras corretas) — limitação inerente ao tamanho reduzido da amostra.
+- A exportação INT8 com LiteRT gera o arquivo como `model_int8.tflite`, exigindo renomeação manual ou `shutil.copy` para o nome esperado (`model.tflite`).
 
 ### 6️⃣ Exemplo de Inferência
 
-Cole a saída do terminal ao rodar `run_inference.py` (número de detecções por
-imagem), e comente brevemente sobre o que observou ao abrir as imagens
-anotadas em `runs/detect/inferencia_exemplos/predicoes/` — por exemplo, se as
-caixas ficaram bem localizadas, se houve confusão entre classes, ou se a
-classe minoritária (`mask_weared_incorrect`) teve desempenho visivelmente pior.
+============================================================
+Projeto 3 — Inferência com model.tflite (Edge AI)
+============================================================
+
+- Rodando inferência em 5 amostras usando model.tflite:
+
+Imagem                               Detecções  Detalhes
+----------------------------------------------------------------------
+Loading /home/kelvao/processoseletivoIA/projetos/3-deteccao-mascaras/model.tflite for LiteRT inference...
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+Results saved to /home/kelvao/processoseletivoIA/projetos/3-deteccao-mascaras/runs/detect/inferencia_exemplos/predicoes
+maksssksksss105.jpg                         10  [10x with_mask]
+Results saved to /home/kelvao/processoseletivoIA/projetos/3-deteccao-mascaras/runs/detect/inferencia_exemplos/predicoes
+maksssksksss107.jpg                          1  [1x with_mask]
+Results saved to /home/kelvao/processoseletivoIA/projetos/3-deteccao-mascaras/runs/detect/inferencia_exemplos/predicoes
+maksssksksss11.jpg                          35  [32x with_mask, 2x mask_weared_incorrect, 1x without_mask]
+Results saved to /home/kelvao/processoseletivoIA/projetos/3-deteccao-mascaras/runs/detect/inferencia_exemplos/predicoes
+maksssksksss113.jpg                          7  [7x with_mask]
+Results saved to /home/kelvao/processoseletivoIA/projetos/3-deteccao-mascaras/runs/detect/inferencia_exemplos/predicoes
+maksssksksss12.jpg                          21  [17x with_mask, 4x without_mask]
+----------------------------------------------------------------------
+TOTAL                                       74
+
+✅ Imagens anotadas salvas em: runs/detect/inferencia_exemplos/predicoes/
+   (Abra essa pasta para verificar visualmente as bounding boxes preditas)
+
+**Observações:** 
+- Em algumas imagens, as labels ficaram sobrepostas aos rostos, mas isso é apenas visual e não impacta as detecções.
+- Na imagem maksssksksss11.jpg, o modelo detectou 35 rostos — 32 com máscara correta, 2 com máscara incorreta e 1 sem máscara — demonstrando que a classe minoritária está sendo capturada mesmo em cenas densas.
 
 ---
 

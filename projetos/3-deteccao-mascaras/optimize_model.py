@@ -1,4 +1,6 @@
+import shutil
 from ultralytics import YOLO
+
 
 # ---------------------------------------------------------------------------
 # Projeto 3 — Otimização do Modelo (Exportação para Edge)
@@ -9,9 +11,6 @@ from ultralytics import YOLO
 #      (a Ultralytics gera automaticamente "model.tflite" na mesma pasta)
 # ---------------------------------------------------------------------------
 
-# insira seu código aqui
-
-# Dica de estrutura (não é obrigatório seguir exatamente assim):
-#
-# model = YOLO("model.pt")
-# model.export(format="tflite", imgsz=...)
+model = YOLO("model.pt")
+model.export(format="tflite", imgsz=640, quantize=8, data="dataset/data.yaml")
+shutil.copy("model_int8.tflite", "model.tflite")
