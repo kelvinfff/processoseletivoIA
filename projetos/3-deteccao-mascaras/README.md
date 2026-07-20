@@ -194,6 +194,7 @@ A técnica utilizada é **post-training quantization (PTQ) estática com calibra
 **Dificuldades encontradas:**
 - **Auto-update travado:** durante a exportação para TFLite, a instalação automática de `litert-torch` e `ai-edge-litert` ficou parada por ~15 minutos. Foi necessário cancelar e instalar as dependências manualmente.
 - **Incompatibilidade torch/torchvision:** o `run_inference.py` quebrou com `RuntimeError: operator torchvision::nms does not exist.` O `requirements.txt` só especificava `ultralytics>=8.4`, e o pip resolveu versões incompatíveis entre PyTorch 2.13 e torchvision 0.28. Resolvido com `pip install --upgrade torch torchvision`.
+- **Incompatibilidade litert-torch/torch na CI:** o workflow falhava na re-execução do `optimize_model.py` porque o auto-update do Ultralytics fazia downgrade do `torch 2.13.0 → 2.12.1`, quebrando a exportação LiteRT. Resolvido adicionando `litert-torch>=0.9.0` e `ai-edge-litert>=2.1.4` ao `requirements.txt` para que todas as dependências fossem instaladas juntas, evitando o auto-update com downgrade.
 
 Decisões técnicas:
 - Uso de `cls_pw=0.5` para mitigar o desbalanceamento — a classe `mask_weared_incorrect` melhorou de 0.549 → 0.611 (+11.3%) sem penalizar as demais.
