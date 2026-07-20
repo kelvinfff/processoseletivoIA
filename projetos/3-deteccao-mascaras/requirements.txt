@@ -1,1 +1,3 @@
 ultralytics>=8.4
+litert-torch>=0.9.0
+ai-edge-litert>=2.1.4
